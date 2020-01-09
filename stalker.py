@@ -4,30 +4,42 @@ import time
 import os
 import pandas as pd
 
-n = int(input("enter number of profiles you want to scrape: "))
+numberOfProfilestoritrieve = int(input("enter number of profiles you want to scrape: "))
 urls=[]
-for i in range(n):
-    url = input("Enter URL of the user no. "+ str(i) + " : ")
+#take input URLs
+for i in range(numberOfProfilestoritrieve):
+    url = input("Enter InstaID of the user no. "+ str(i+1) + " : ")
+    url = "https://www.instagram.com/"+url+"/"
     urls.append(url)
 #USER SPECIFIC:change your driver's location here
 webdriver = "/Users/kshitizsharma/Downloads/chromedriver"
 driver = Chrome(webdriver)
 
+#Start scraping each target user
 for url in urls:
-    driver.get(url)
-    ###############
+    try:
+        driver.get(url)
+    except:
+        print("wrong username given: " + url.replace("https://www.instagram.com/","").replace("/",""))
+        continue
+    ##Time to pause after each scroll##
     SCROLL_PAUSE_TIME = 1.5
 
     # Get scroll height
     last_height = driver.execute_script("return document.body.scrollHeight")
     count=0
     picMenuLinks = []
+    #Get links to individual post pages
     while True:
         items = driver.find_elements_by_class_name("ySN3v")
         for item in items:
             x=item.find_elements_by_tag_name("a")
             for el in x:
-                picMenuLink = el.get_attribute("href")
+                try:
+                    picMenuLink = el.get_attribute("href")
+                except:
+                    print("exception in line 30")
+                    continue
                 if picMenuLink not in picMenuLinks:
                     picMenuLinks.append(picMenuLink)
 
@@ -42,6 +54,7 @@ for url in urls:
         if new_height == last_height:
             break
         last_height = new_height
+    print(str(len(picMenuLinks)) + " posts found" )
 
     username = url.replace("https://www.instagram.com/","").replace("/","")
    
@@ -54,15 +67,62 @@ for url in urls:
     else:
         print ("Successfully created the directory %s " % path)
 
-    print(str(len(picMenuLinks)) + " posts found" )
+
+    #Go to individual post pages
     for picMenuLink in picMenuLinks:
-        driver.get(picMenuLink)
-        items=driver.find_elements_by_class_name("KL4Bh")
+        try:
+            driver.get(picMenuLink)
+            items=driver.find_elements_by_class_name("KL4Bh")
+        except:
+            print("Failed to ritrieve image")
+            continue
+        imageLinks=[]
         if(len(items)>0):
             x = items[0].find_elements_by_tag_name("img")
             for xt in x:
-                linkToImage=x[0].get_attribute("src")
-                driver.get(linkToImage)
-                driver.get_screenshot_as_file(path+"/"+username+str(count)+".png")
-                print("did image number "+str(count)+" for "+username)
-                count+=1
+                try:
+                    linkToImage=x[0].get_attribute("src")
+                    imageLinks.append(linkToImage)
+                except:
+                    print("coulnot get src to image")
+        
+        #get to more images if any in this post
+        moreImageinThisPost = True; shiftedRight=False
+        while(moreImageinThisPost):
+            try:
+                # search for right button when current image is not leftmost
+                button=driver.find_elements_by_xpath("/html/body/div[1]/section/main/div/div/article/div[1]/div/div/div[2]/div/button[2]")
+                if len(button)==0 and shiftedRight==False: #search for right button when current image is not leftmost
+                    button=driver.find_elements_by_xpath("/html/body/div[1]/section/main/div/div/article/div[1]/div/div/div[2]/div/button")
+                if(len(button))>0:
+                    button=button[0]
+                
+                button.click()
+                shiftedRight=True
+                items=driver.find_elements_by_class_name("KL4Bh")
+                for item in items:
+                    imgDivs = item.find_elements_by_tag_name("img")
+                    for imgDiv in imgDivs:
+                        linkToImage=imgDiv.get_attribute("src")
+                        if linkToImage not in imageLinks:
+                            imageLinks.append(linkToImage)
+            except:
+                moreImageinThisPost=False
+                print("no more buttons to next image")
+        print("no. of images in this post is : "+str(len(imageLinks)))
+
+        #retrieve all the images from imageLinks found in this post page(picMenuLink)
+        for imageLink in imageLinks:
+            try:
+                driver.get(imageLink)
+            except:
+                print("failed to download image from link: " + imageLink)
+                continue
+            driver.get_screenshot_as_file(path+"/"+username+str(count)+".png")
+            
+            print("did image number "+str(count)+" for "+username)
+            count+=1
+            if count%20==0:
+                sleep(10)
+            if count%100==0:
+                sleep(100)
