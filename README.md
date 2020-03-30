@@ -1,4 +1,4 @@
-# Instagram-Stalker
+# Instagram-Scraper
 A selenium based python script that scrapes images on profile of desired instagram profile's.
 Requirements: Chrome web-browser, chrome webdriver for selenium.
 Steps:
